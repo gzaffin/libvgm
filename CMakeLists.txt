@@ -12,7 +12,7 @@ endif()
 
 project(libvgmMain VERSION 0.1 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/cmake_modules/")
 
@@ -66,11 +66,9 @@ if(MSVC)
 	set(CMAKE_DEBUG_POSTFIX "_${MSVC_POSTFIX}${CMAKE_DEBUG_POSTFIX}")
 	set(CMAKE_MINSIZEREL_POSTFIX "_${MSVC_POSTFIX}${CMAKE_MINSIZEREL_POSTFIX}")
 	set(CMAKE_RELWITHDEBINFO_POSTFIX "_${MSVC_POSTFIX}${CMAKE_RELWITHDEBINFO_POSTFIX}")
-	
-	set(ZLIB_ROOT "${PROJECT_SOURCE_DIR}/libs" CACHE PATH "ZLib directory")
-	set(Iconv_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/libs/iconv/include" CACHE PATH "directory with iconv headers")
-	set(Iconv_LIBRARY "${PROJECT_SOURCE_DIR}/libs/iconv/lib/libiconv.lib" CACHE FILEPATH "iconv library")
-	
+
+	find_package(Iconv)
+
 	if(NOT MSVC_VERSION LESS 1400)
 		# Note: CMake 3.12 and up have add_compile_options()
 		add_definitions("-D _CRT_SECURE_NO_WARNINGS")
@@ -90,9 +88,9 @@ endif()
 
 if(CMAKE_COMPILER_IS_GNUCC)
 
-# assume Windows 2000 and later for GetConsoleWindow API call
+# assume Windows 10 and later for GetConsoleWindow API call
 if(WIN32)
-	add_definitions("-D _WIN32_WINNT=0x500")
+	add_definitions("-D _WIN32_WINNT=0x0A00 -D WINVER=0x0A00")
 endif()
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
 
@@ -200,7 +198,11 @@ endif(BUILD_TESTS)
 if(BUILD_PLAYER)
 add_executable(player player.cpp player/dblk_compr.c)
 target_include_directories(player PRIVATE ${LIBVGM_SOURCE_DIR})
-target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils)
+if(MSVC)
+	target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils Iconv::Iconv)
+else()
+	target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils)
+endif()
 if(USE_SANITIZERS)
 	add_sanitizers(player)
 endif(USE_SANITIZERS)
