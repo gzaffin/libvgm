@@ -372,30 +372,36 @@ UINT8 XAudio2_Create(void** retDrvObj)
 	UINT8 retVal8;
 
 	drv = (DRV_XAUD2*)malloc(sizeof(DRV_XAUD2));
-	drv->devState = 0;
-	drv->pXAudio2.detach();
-	drv->pXAudio2.~com_ptr();
-	drv->xaMstVoice = NULL;
-	drv->xaSrcVoice = NULL;
-	drv->xaBufs = NULL;
-	drv->hThread = NULL;
-	drv->hSignal = NULL;
-	drv->hMutex = NULL;
-	drv->userParam = NULL;
-	drv->FillBuffer = NULL;
+	if (nullptr != drv) {
+		drv->devState = 0u;
+		drv->pXAudio2.detach();
+		drv->pXAudio2.~com_ptr();
+		drv->xaMstVoice = nullptr;
+		drv->xaSrcVoice = nullptr;
+		drv->xaBufs = nullptr;
+		drv->hThread = nullptr;
+		drv->hSignal = nullptr;
+		drv->hMutex = nullptr;
+		drv->userParam = nullptr;
+		drv->FillBuffer = nullptr;
 
-	activeDrivers ++;
-	retVal8  = OSSignal_Init(&drv->hSignal, 0);
-	retVal8 |= OSMutex_Init(&drv->hMutex, 0);
-	if (retVal8)
-	{
-		XAudio2_Destroy(drv);
-		*retDrvObj = NULL;
-		return AERR_API_ERR;
+		activeDrivers ++;
+		retVal8  = OSSignal_Init(&drv->hSignal, 0);
+		retVal8 |= OSMutex_Init(&drv->hMutex, 0);
+		if (retVal8)
+		{
+			XAudio2_Destroy(drv);
+			*retDrvObj = nullptr;
+			return AERR_API_ERR;
+		}
 	}
-	*retDrvObj = drv;
 
-	return AERR_OK;
+	*retDrvObj = drv;
+	if (nullptr == drv) {
+		return AERR_API_ERR;
+	} else {
+		return AERR_OK;
+	}
 }
 
 UINT8 XAudio2_Destroy(void* drvObj)
@@ -465,7 +471,7 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	drv->bufCount = options->numBuffers ? options->numBuffers : 10;
 
 	retVal = CoInitializeEx(NULL, COINIT_MULTITHREADED);	// call again, in case Init() was called by another thread
-	if (! (retVal == S_OK || retVal == S_FALSE)) {
+	if (!(retVal == S_OK || retVal == S_FALSE)) {
 		return AERR_API_ERR;
 	}
 
@@ -478,24 +484,29 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	}
 
 	//drv->pXAudio2.copy_from(pXAudio2.get());
-	retVal = drv->pXAudio2->CreateMasteringVoice(&drv->xaMstVoice,
-				XAUDIO2_DEFAULT_CHANNELS, drv->waveFmt.nSamplesPerSec, 0x00,
-				NULL, NULL);
+	retVal = drv->pXAudio2->CreateMasteringVoice(&drv->xaMstVoice, \
+		XAUDIO2_DEFAULT_CHANNELS, drv->waveFmt.nSamplesPerSec, 0x00, \
+		NULL, NULL);
 	if (retVal != S_OK) {
 		return AERR_API_ERR;
 	}
-	retVal = drv->pXAudio2->CreateSourceVoice(&drv->xaSrcVoice,
-				&drv->waveFmt, 0x00, XAUDIO2_DEFAULT_FREQ_RATIO, NULL, NULL, NULL);
+
+	retVal = drv->pXAudio2->CreateSourceVoice(&drv->xaSrcVoice, \
+		&drv->waveFmt, 0x00, XAUDIO2_DEFAULT_FREQ_RATIO, NULL, NULL, NULL);
+	if (retVal != S_OK) {
+		return AERR_API_ERR;
+	}
 
 	OSSignal_Reset(drv->hSignal);
 	retVal8 = OSThread_Init(&drv->hThread, &XAudio2Thread, drv);
 	if (retVal8) {
 		return 0xC8;	// CreateThread failed
 	}
+
 #ifdef NDEBUG
 	hWinThr = *(HANDLE*)OSThread_GetHandle(drv->hThread);
 	retValB = SetThreadPriority(hWinThr, THREAD_PRIORITY_TIME_CRITICAL);
-	if (! retValB)
+	if (!retValB)
 	{
 		// Error setting priority
 		// Try a lower priority, because too low priorities cause sound stuttering.
@@ -505,17 +516,24 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 
 	drv->xaBufs = (XAUDIO2_BUFFER*)calloc(drv->bufCount, sizeof(XAUDIO2_BUFFER));
 	drv->bufSpace = (UINT8*)malloc(drv->bufCount * drv->bufSize);
-	for (curBuf = 0; curBuf < drv->bufCount; curBuf ++)
-	{
-		tempXABuf = &drv->xaBufs[curBuf];
-		tempXABuf->AudioBytes = drv->bufSize;
-		tempXABuf->pAudioData = &drv->bufSpace[drv->bufSize * curBuf];
-		tempXABuf->pContext = NULL;
-		tempXABuf->Flags = 0x00;
+	if ((nullptr != drv->xaBufs) && (nullptr != drv->bufSpace)) {
+		for (curBuf = 0; curBuf < drv->bufCount; curBuf++)
+		{
+			tempXABuf = &drv->xaBufs[curBuf];
+			tempXABuf->AudioBytes = drv->bufSize;
+			tempXABuf->pAudioData = &drv->bufSpace[drv->bufSize * curBuf];
+			tempXABuf->pContext = NULL;
+			tempXABuf->Flags = 0x00;
+		}
+		drv->writeBuf = 0;
+	} else {
+		return AERR_BAD_MODE;
 	}
-	drv->writeBuf = 0;
 
 	retVal = drv->xaSrcVoice->Start(0x00, XAUDIO2_COMMIT_NOW);
+	if (retVal != S_OK) {
+		return AERR_API_ERR;
+	}
 
 	drv->devState = 1;
 	OSSignal_Signal(drv->hSignal);
