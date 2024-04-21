@@ -1233,9 +1233,9 @@ static UINT8 StartAudioDevice(void)
 		opts = AudioDrv_GetOptions(audDrvLog);
 	if (opts == NULL)
 		return 0xFF;
-	opts->sampleRate = sampleRate;
-	opts->numChannels = 2;
-	opts->numBitsPerSmpl = 16;
+	/*opts->sampleRate = sampleRate;*/
+	/*opts->numChannels = 2;*/
+	/*opts->numBitsPerSmpl = 16;*/
 	smplSize = opts->numChannels * opts->numBitsPerSmpl / 8;
 	
 	if (audDrv != NULL)
@@ -1244,7 +1244,7 @@ static UINT8 StartAudioDevice(void)
 		retVal = AudioDrv_Start(audDrv, idWavOutDev);
 		if (retVal)
 		{
-			fprintf(stderr, "Device Init Error: %02X\n", retVal);
+			fprintf(stderr, "Driver Start Error: %02X\n", retVal);
 			return retVal;
 		}
 		
