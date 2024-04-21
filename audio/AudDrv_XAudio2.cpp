@@ -101,7 +101,7 @@ static HRESULT DeviceNameGet(winrt::com_ptr<::IMMDeviceCollection> dc, UINT id, 
 	hr = pDevice->GetId(&deviceId);
 	if (FAILED(hr))
 	{
-		std::wprintf(L"Failed to GetId Device: %#lX\n", static_cast<unsigned long>(hr));
+		std::wprintf(L"Failed to get device ID: %#lX\n", static_cast<unsigned long>(hr));
 		return hr;
 	}
 
@@ -124,11 +124,11 @@ static HRESULT DeviceNameGet(winrt::com_ptr<::IMMDeviceCollection> dc, UINT id, 
 
 	// GetValue succeeds and returns S_OK if PKEY_Device_FriendlyName is not found.
 	// In this case vartName.vt is set to VT_EMPTY.
-	if (pv.vt != VT_EMPTY)
-	{
+	//if (pv.vt != VT_EMPTY)
+	//{
 		// Print audio endpoint device endpoint ID string.
-		std::wprintf(L"deviceId=%d: audio endpoint device endpoint ID string %s\n", id, deviceId);
-	}
+		//std::wprintf(L"deviceId=%d: audio endpoint device endpoint ID string %s\n", id, deviceId);
+	//}
 
 	PropVariantClear(&pv);
 	CoTaskMemFree(deviceId);
@@ -153,7 +153,9 @@ typedef struct _xaudio2_driver
 	winrt::com_ptr<::IXAudio2> pXAudio2;
 	IXAudio2MasteringVoice* xaMstVoice;
 	IXAudio2SourceVoice* xaSrcVoice;
+
 	XAUDIO2_BUFFER* xaBufs;
+
 	OS_THREAD* hThread;
 	OS_SIGNAL* hSignal;
 	OS_MUTEX* hMutex;
@@ -232,10 +234,11 @@ UINT8 XAudio2_Init(void)
 	}
 
 	deviceList.devCount = 0;
-	deviceList.devNames = NULL;
+	deviceList.devNames = nullptr;
 	
-	retVal = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	retVal = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 	if (!(retVal == S_OK || retVal == S_FALSE)) {
+		std::wprintf(L"Failed to init COM: %#lX\n", static_cast<unsigned long>(retVal));
 		return AERR_API_ERR;
 	}
 
@@ -272,6 +275,7 @@ UINT8 XAudio2_Init(void)
 	if (FAILED(retVal))
 	{
 		std::wprintf(L"Failed to init deviceEnumerator: %#lX\n", static_cast<unsigned long>(retVal));
+		return AERR_API_ERR;
 	}
 
 	//
@@ -283,6 +287,7 @@ UINT8 XAudio2_Init(void)
 	if (FAILED(retVal))
 	{
 		std::wprintf(L"Failed to init deviceCollection: %#lX\n", static_cast<unsigned long>(retVal));
+		return AERR_API_ERR;
 	}
 
 	UINT nDevices = 0u;
@@ -290,6 +295,7 @@ UINT8 XAudio2_Init(void)
 	if (FAILED(retVal))
 	{
 		std::wprintf(L"Failed to deviceCollection::Getcount method: %#lX\n", static_cast<unsigned long>(retVal));
+		return AERR_API_ERR;
 	}
 
 	std::vector<sCoreAudioDeviceInfo> deviceInfo;
@@ -306,7 +312,7 @@ UINT8 XAudio2_Init(void)
 		char char_device_name[CORE_AUDIO_DEVICE_NAME_COUNT];
 		std::memset(char_device_name, 0, sizeof char_device_name);
 		WideCharToMultiByte(CP_ACP, 0, widechar_device_name, -1, char_device_name, sizeof char_device_name - 1, nullptr, nullptr);
-		printf("    deviceId=%d: %s\n", i, char_device_name);
+		printf("    device ID %d: %s\n", i, char_device_name);
 
 		size_t name_length = strlen(char_device_name) + (size_t)1u;
 		deviceList.devNames[i] = (char*)malloc(name_length);
@@ -316,9 +322,7 @@ UINT8 XAudio2_Init(void)
 
 	deviceList.devCount = nDevices;
 
-	//pXAudio2->Release();	pXAudio2 = NULL;
-	pXAudio2.detach();
-	pXAudio2.~com_ptr();
+	pXAudio2.~com_ptr();	pXAudio2 = nullptr;
 
 	CoUninitialize();
 
@@ -332,6 +336,7 @@ UINT8 XAudio2_Init(void)
 	activeDrivers = 0;
 	isInit = 1;
 
+	CoUninitialize();
 	return AERR_OK;
 }
 
@@ -348,7 +353,7 @@ UINT8 XAudio2_Deinit(void)
 		free(deviceList.devNames[curDev]);
 	}
 	deviceList.devCount = 0;
-	free(deviceList.devNames);	deviceList.devNames = NULL;
+	free(deviceList.devNames);	deviceList.devNames = nullptr;
 
 	CoUninitialize();
 	isInit = 0;
@@ -368,14 +373,13 @@ AUDIO_OPTS* XAudio2_GetDefaultOpts(void)
 
 UINT8 XAudio2_Create(void** retDrvObj)
 {
-	DRV_XAUD2* drv;
-	UINT8 retVal8;
+	DRV_XAUD2* drv = new (DRV_XAUD2);
 
-	drv = (DRV_XAUD2*)malloc(sizeof(DRV_XAUD2));
 	if (nullptr != drv) {
+		UINT8 retVal8;
+
 		drv->devState = 0u;
-		drv->pXAudio2.detach();
-		drv->pXAudio2.~com_ptr();
+		*(drv->pXAudio2.put_void()) = nullptr;
 		drv->xaMstVoice = nullptr;
 		drv->xaSrcVoice = nullptr;
 		drv->xaBufs = nullptr;
@@ -394,13 +398,11 @@ UINT8 XAudio2_Create(void** retDrvObj)
 			*retDrvObj = nullptr;
 			return AERR_API_ERR;
 		}
-	}
+		*retDrvObj = std::move(drv);
 
-	*retDrvObj = drv;
-	if (nullptr == drv) {
-		return AERR_API_ERR;
-	} else {
 		return AERR_OK;
+	} else {
+		return AERR_API_ERR;
 	}
 }
 
@@ -411,15 +413,15 @@ UINT8 XAudio2_Destroy(void* drvObj)
 	if (drv->devState != 0) {
 		XAudio2_Stop(drvObj);
 	}
-	if (drv->hThread != NULL)
+	if (drv->hThread != nullptr)
 	{
 		OSThread_Cancel(drv->hThread);
 		OSThread_Deinit(drv->hThread);
 	}
-	if (drv->hSignal != NULL) {
+	if (drv->hSignal != nullptr) {
 		OSSignal_Deinit(drv->hSignal);
 	}
-	if (drv->hMutex != NULL) {
+	if (drv->hMutex != nullptr) {
 		OSMutex_Deinit(drv->hMutex);
 	}
 	free(drv);
@@ -430,7 +432,7 @@ UINT8 XAudio2_Destroy(void* drvObj)
 
 UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* audDrvParam)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 	UINT64 tempInt64;
 	UINT32 curBuf;
 	XAUDIO2_BUFFER* tempXABuf;
@@ -454,7 +456,7 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	}
 
 	drv->audDrvPtr = audDrvParam;
-	if (options == NULL) {
+	if (options == nullptr) {
 		options = &defOptions;
 	}
 	drv->waveFmt.wFormatTag = WAVE_FORMAT_PCM;
@@ -470,8 +472,9 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	drv->bufSize = drv->waveFmt.nBlockAlign * drv->bufSmpls;
 	drv->bufCount = options->numBuffers ? options->numBuffers : 10;
 
-	retVal = CoInitializeEx(NULL, COINIT_MULTITHREADED);	// call again, in case Init() was called by another thread
+	retVal = CoInitializeEx(nullptr, COINIT_MULTITHREADED);	// call again, in case Init() was called by another thread
 	if (!(retVal == S_OK || retVal == S_FALSE)) {
+		std::wprintf(L"Failed to init COM: %#lX\n", static_cast<unsigned long>(retVal));
 		return AERR_API_ERR;
 	}
 
@@ -486,13 +489,13 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	//drv->pXAudio2.copy_from(pXAudio2.get());
 	retVal = drv->pXAudio2->CreateMasteringVoice(&drv->xaMstVoice, \
 		XAUDIO2_DEFAULT_CHANNELS, drv->waveFmt.nSamplesPerSec, 0x00, \
-		NULL, NULL);
+		nullptr, nullptr);
 	if (retVal != S_OK) {
 		return AERR_API_ERR;
 	}
 
 	retVal = drv->pXAudio2->CreateSourceVoice(&drv->xaSrcVoice, \
-		&drv->waveFmt, 0x00, XAUDIO2_DEFAULT_FREQ_RATIO, NULL, NULL, NULL);
+		&drv->waveFmt, 0x00, XAUDIO2_DEFAULT_FREQ_RATIO, nullptr, nullptr, nullptr);
 	if (retVal != S_OK) {
 		return AERR_API_ERR;
 	}
@@ -522,7 +525,7 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 			tempXABuf = &drv->xaBufs[curBuf];
 			tempXABuf->AudioBytes = drv->bufSize;
 			tempXABuf->pAudioData = &drv->bufSpace[drv->bufSize * curBuf];
-			tempXABuf->pContext = NULL;
+			tempXABuf->pContext = nullptr;
 			tempXABuf->Flags = 0x00;
 		}
 		drv->writeBuf = 0;
@@ -551,21 +554,19 @@ UINT8 XAudio2_Stop(void* drvObj)
 	}
 
 	drv->devState = 2;
-	if (drv->xaSrcVoice != NULL) {
+	if (drv->xaSrcVoice != nullptr) {
 		retVal = drv->xaSrcVoice->Stop(0x00, XAUDIO2_COMMIT_NOW);
 	}
 
 	OSThread_Join(drv->hThread);
-	OSThread_Deinit(drv->hThread);	drv->hThread = NULL;
+	OSThread_Deinit(drv->hThread);	drv->hThread = nullptr;
 
-	drv->xaMstVoice->DestroyVoice();	drv->xaMstVoice = NULL;
-	drv->xaSrcVoice->DestroyVoice();	drv->xaSrcVoice = NULL;
-	//drv->pXAudio2->Release();			drv->pXAudio2 = NULL;
-	drv->pXAudio2.detach();
-	drv->pXAudio2.~com_ptr();
+	drv->xaMstVoice->DestroyVoice();	/*drv->xaMstVoice.~com_ptr();*/	drv->xaMstVoice = nullptr;
+	drv->xaSrcVoice->DestroyVoice();	/*drv->xaSrcVoice.~com_ptr();*/	drv->xaSrcVoice = nullptr;
+	drv->pXAudio2.~com_ptr();			drv->pXAudio2 = nullptr;
 
-	free(drv->xaBufs);		drv->xaBufs = NULL;
-	free(drv->bufSpace);	drv->bufSpace = NULL;
+	free(drv->xaBufs);		drv->xaBufs = nullptr;
+	free(drv->bufSpace);	drv->bufSpace = nullptr;
 
 	CoUninitialize();
 	drv->devState = 0;
@@ -588,7 +589,7 @@ UINT8 XAudio2_Pause(void* drvObj)
 
 UINT8 XAudio2_Resume(void* drvObj)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 	HRESULT retVal;
 
 	if (drv->devState != 1) {
@@ -602,7 +603,7 @@ UINT8 XAudio2_Resume(void* drvObj)
 
 UINT8 XAudio2_SetCallback(void* drvObj, AUDFUNC_FILLBUF FillBufCallback, void* userParam)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 
 	OSMutex_Lock(drv->hMutex);
 	drv->userParam = userParam;
@@ -614,17 +615,17 @@ UINT8 XAudio2_SetCallback(void* drvObj, AUDFUNC_FILLBUF FillBufCallback, void* u
 
 UINT32 XAudio2_GetBufferSize(void* drvObj)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 
 	return drv->bufSize;
 }
 
 UINT8 XAudio2_IsBusy(void* drvObj)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 	XAUDIO2_VOICE_STATE xaVocState;
 
-	if (drv->FillBuffer != NULL) {
+	if (drv->FillBuffer != nullptr) {
 		return AERR_BAD_MODE;
 	}
 
@@ -634,7 +635,7 @@ UINT8 XAudio2_IsBusy(void* drvObj)
 
 UINT8 XAudio2_WriteData(void* drvObj, UINT32 dataSize, void* data)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 	XAUDIO2_BUFFER* tempXABuf;
 	XAUDIO2_VOICE_STATE xaVocState;
 	HRESULT retVal;
@@ -654,7 +655,7 @@ UINT8 XAudio2_WriteData(void* drvObj, UINT32 dataSize, void* data)
 	memcpy((void*)tempXABuf->pAudioData, data, dataSize);
 	tempXABuf->AudioBytes = dataSize;
 
-	retVal = drv->xaSrcVoice->SubmitSourceBuffer(tempXABuf, NULL);
+	retVal = drv->xaSrcVoice->SubmitSourceBuffer(tempXABuf, nullptr);
 	drv->writeBuf ++;
 	if (drv->writeBuf >= drv->bufCount) {
 		drv->writeBuf -= drv->bufCount;
@@ -666,7 +667,7 @@ UINT8 XAudio2_WriteData(void* drvObj, UINT32 dataSize, void* data)
 
 UINT32 XAudio2_GetLatency(void* drvObj)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)drvObj;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(drvObj);
 	XAUDIO2_VOICE_STATE xaVocState;
 	UINT32 bufBehind;
 	UINT32 bytesBehind;
@@ -691,7 +692,7 @@ UINT32 XAudio2_GetLatency(void* drvObj)
 
 static void XAudio2Thread(void* Arg)
 {
-	DRV_XAUD2* drv = (DRV_XAUD2*)Arg;
+	DRV_XAUD2* drv = reinterpret_cast<DRV_XAUD2*>(Arg);
 	XAUDIO2_VOICE_STATE xaVocState;
 	XAUDIO2_BUFFER* tempXABuf;
 	UINT32 didBuffers;	// number of processed buffers
@@ -704,13 +705,13 @@ static void XAudio2Thread(void* Arg)
 
 		OSMutex_Lock(drv->hMutex);
 		drv->xaSrcVoice->GetState(&xaVocState);
-		while(xaVocState.BuffersQueued < drv->bufCount && drv->FillBuffer != NULL)
+		while(xaVocState.BuffersQueued < drv->bufCount && drv->FillBuffer != nullptr)
 		{
 			tempXABuf = &drv->xaBufs[drv->writeBuf];
 			tempXABuf->AudioBytes = drv->FillBuffer(drv->audDrvPtr, drv->userParam,
 										drv->bufSize, (void*)tempXABuf->pAudioData);
 
-			HRESULT retVal = drv->xaSrcVoice->SubmitSourceBuffer(tempXABuf, NULL);
+			HRESULT retVal = drv->xaSrcVoice->SubmitSourceBuffer(tempXABuf, nullptr);
 			drv->writeBuf ++;
 			if (drv->writeBuf >= drv->bufCount)
 				drv->writeBuf -= drv->bufCount;
@@ -722,7 +723,7 @@ static void XAudio2Thread(void* Arg)
 		if (! didBuffers) {
 			Sleep(1);
 		}
-		while(drv->FillBuffer == NULL && drv->devState == 1) {
+		while(drv->FillBuffer == nullptr && drv->devState == 1) {
 			Sleep(1);
 		}
 		//while(drv->PauseThread && drv->devState == 1) {
