@@ -16,10 +16,10 @@ PS C:\<PATH>\vcpkg>vcpkg install libiconv:x64-windows zlib:x64-windows
 Clone repository and compile sources
 ```
 PS C:\<PATH>>git clone https://github.com/gzaffin/libvgm.git
-PS C:\<PATH>\libvgm>cd libvgm
+PS C:\<PATH>>cd libvgm
 PS C:\<PATH>\libvgm>mkdir build
 PS C:\<PATH>\libvgm>cd build
 PS C:\<PATH>\libvgm\build>cmake -G "Visual Studio 17 2022" -A x64 -T host=x64 -D CMAKE_TOOLCHAIN_FILE=C:/<PATH>/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-PS C:\<PATH>\libvgm\build>cmake --build . --config Release --target pmdplay
+PS C:\<PATH>\libvgm\build>cmake --build . --config Release
 ```
 
