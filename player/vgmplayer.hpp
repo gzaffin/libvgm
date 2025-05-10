@@ -66,6 +66,7 @@ public:
 		UINT32 flags;
 		size_t optID;
 		size_t cfgID;
+		DEVFUNC_READ_A8D8 read8;		// read 8-bit data from 8-bit register/offset (required by K007232)
 		DEVFUNC_WRITE_A8D8 write8;		// write 8-bit data to 8-bit register/offset
 		DEVFUNC_WRITE_A16D8 writeM8;	// write 8-bit data to 16-bit memory offset
 		DEVFUNC_WRITE_A8D16 writeD16;	// write 16-bit data to 8-bit register/offset
@@ -273,6 +274,7 @@ protected:
 	void Cmd_YMW_Bank(void);				// command C3 - YMW258 bank write (Ofs8_Data16 with remapping)
 	void Cmd_SAA_Reg(void);					// command BD - SAA1099 register write (Reg8_Data8 with remapping)
 	void Cmd_OKIM6295_Reg(void);			// command B8 - OKIM6295 register write (Ofs8_Data8 with minor fixes)
+	void Cmd_K007232_Reg(void);				// command 41 - K007232 register write (Ofs8_Data8 with minor fixes)
 	void Cmd_AY_Stereo(void);				// command 30 - set AY8910 stereo mask
 	
 	CPCONV* _cpcUTF16;	// UTF-16 LE -> UTF-8 codepage conversion
@@ -285,8 +287,8 @@ protected:
 	enum
 	{
 		_HDR_BUF_SIZE = 0x100,
-		_OPT_DEV_COUNT = 0x2a,
-		_CHIP_COUNT = 0x2a,
+		_OPT_DEV_COUNT = 0x2b,
+		_CHIP_COUNT = 0x2b,
 		_PCM_BANK_COUNT = 0x40
 	};
 	
@@ -325,12 +327,12 @@ protected:
 	UINT64 _lastTsMult;
 	UINT64 _lastTsDiv;
 	
-	UINT32 _filePos;
-	UINT32 _fileTick;
-	UINT32 _playTick;
-	UINT32 _playSmpl;
-	UINT32 _curLoop;
-	UINT32 _lastLoopTick;
+	UINT32 _filePos;	// file offset of next command to parse
+	UINT32 _fileTick;	// tick time of next command to parse
+	UINT32 _playTick;	// tick time when last parsing was issued (up to 1 Render() call behind current position)
+	UINT32 _playSmpl;	// sample time
+	UINT32 _curLoop;	// current repetition, 0 = first playthrough, 1 = repeating 1st time
+	UINT32 _lastLoopTick;	// tick time of last loop, used for "0-sample-loop" detection
 	
 	UINT8 _playState;
 	UINT8 _psTrigger;	// used to temporarily trigger special commands
