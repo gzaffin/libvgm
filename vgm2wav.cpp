@@ -397,7 +397,7 @@ static void set_core(PlayerBase *player, UINT8 devId, UINT32 coreId) {
 static void dump_info(PlayerBase *player) {
     std::vector<PLR_DEV_INFO> devInfList;
     PLR_SONG_INFO songInfo;
-    const DEV_DEF **devDefList;
+    const DEV_DEF* const* devDefList;
     UINT32 i;
     char str[5];
 
@@ -455,7 +455,7 @@ fmt_time(double sec) {
     i_min = i_min % 60;
 
     if(i_hour > 0) {
-        snprintf(ts,4,"%02u:",i_hour);
+        snprintf(ts,4,"%02u:",i_hour % 100);
     }
     if(i_min > 0) {
         snprintf(&ts[strlen(ts)],4,"%02u:",i_min);

@@ -61,7 +61,7 @@ public:
 	{
 		VGM_BASEDEV base;
 		UINT8 vgmChipType;
-		UINT8 chipType;
+		DEV_ID chipType;
 		UINT8 chipID;
 		UINT32 flags;
 		size_t optID;
@@ -89,12 +89,6 @@ public:
 	};
 
 protected:
-	struct HDR_CHIP_DEF
-	{
-		UINT8 devType;
-		UINT16 volume;
-		UINT32 clock;
-	};
 	struct XHDR_DATA32
 	{
 		UINT8 type;
@@ -111,7 +105,7 @@ protected:
 	{
 		size_t deviceID;	// index for _devices array
 		UINT8 vgmChipType;
-		UINT8 type;
+		DEV_ID type;
 		UINT8 instance;
 		std::vector<UINT8> cfgData;
 	};
@@ -265,7 +259,7 @@ protected:
 	void Cmd_SegaPCM_Mem(void);				// command C0 - SegaPCM memory write
 	void Cmd_RF5C_Mem(void);				// command C1/C2 - RF5C68/164 memory write
 	void Cmd_RF5C_Reg(void);				// command B0/B1 - RF5C68/164 register write
-	void Cmd_PWM_Reg(void);					// command B2 - PWM register write (4-bit offset, 12-bit data)
+	void Cmd_Ofs4_Data12(void);				// command B2/42 - PWM/K005289 register write (4-bit offset, 12-bit data)
 	void Cmd_QSound_Reg(void);				// command C4 - QSound register write (16-bit data, 8-bit offset)
 	static void WriteQSound_A(CHIP_DEVICE* cDev, UINT8 ofs, UINT16 data);	// write by calling write8
 	static void WriteQSound_B(CHIP_DEVICE* cDev, UINT8 ofs, UINT16 data);	// write by calling writeD16
@@ -287,8 +281,8 @@ protected:
 	enum
 	{
 		_HDR_BUF_SIZE = 0x100,
-		_OPT_DEV_COUNT = 0x2b,
-		_CHIP_COUNT = 0x2b,
+		_OPT_DEV_COUNT = 0x2c,
+		_CHIP_COUNT = 0x2c,
 		_PCM_BANK_COUNT = 0x40
 	};
 	
@@ -341,8 +335,8 @@ protected:
 	//PLAYER_FILEREQ_CB _fileReqCbFunc;
 	//void* _fileReqCbParam;
 	
-	static const UINT8 _OPT_DEV_LIST[_OPT_DEV_COUNT];	// list of configurable libvgm devices (different from VGM chip list]
-	static const UINT8 _DEV_LIST[_CHIP_COUNT];	// VGM chip ID -> libvgm device ID
+	static const DEV_ID _OPT_DEV_LIST[_OPT_DEV_COUNT];	// list of configurable libvgm devices (different from VGM chip list]
+	static const DEV_ID _DEV_LIST[_CHIP_COUNT];	// VGM chip ID -> libvgm device ID
 	static const UINT32 _CHIPCLK_OFS[_CHIP_COUNT];	// file offsets for chip clocks in VGM header
 	static const UINT16 _CHIP_VOLUME[_CHIP_COUNT];	// default volume for chips
 	static const UINT16 _PB_VOL_AMNT[_CHIP_COUNT];	// amount of the chip's playback volume in overall gain
