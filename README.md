@@ -9,7 +9,7 @@ As it can be seen from CMakeLists.txt, the following two packages are required:
 1. libiconv
 2. zlib
 
-Install packages with vcpkg verb [vcpkg install <package>...](https://learn.microsoft.com/en-us/vcpkg/commands/install)
+Install packages with vcpkg with [vcpkg install <package>...](https://learn.microsoft.com/en-us/vcpkg/commands/install) command
 ```
 PS C:\<PATH>\vcpkg>vcpkg install libiconv:x64-windows zlib:x64-windows
 ```
