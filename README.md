@@ -1,9 +1,9 @@
 ## libvgm
-fork of [ValleyBell / libvgm](https://github.com/ValleyBell/libvgm), here the focus is buiding from source with Visual Studio's MSVC + vcpkg + CMake in Windows 10/Windows 11.
+fork of [ValleyBell / libvgm](https://github.com/ValleyBell/libvgm), here the focus is building from source with Microsoft's Visual Studio MSVC + vcpkg + CMake in Windows 10/Windows 11.
 
 # How to build
-Used Visual Studio. [Install Visual Studio](https://learn.microsoft.com/en-us/visualstudio/install/install-visual-studio?view=vs-2022) .
-Used vcpkg cross-platform C/C++ package manager. [Install and use packages with vcpkg](https://learn.microsoft.com/en-us/vcpkg/commands/install) .
+Use Microsoft's Visual Studio. [Install Visual Studio](https://learn.microsoft.com/en-us/visualstudio/install/install-visual-studio?view=vs-2022) .
+Use vcpkg cross-platform C/C++ package manager. [Install and use packages with vcpkg](https://learn.microsoft.com/en-us/vcpkg/commands/install) .
 
 As it can be seen from CMakeLists.txt, the following two packages are required:
 1. libiconv
