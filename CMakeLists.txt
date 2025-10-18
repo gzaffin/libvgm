@@ -12,7 +12,7 @@ endif()
 
 project(libvgmMain VERSION 0.1 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/cmake_modules/")
 
@@ -201,7 +201,7 @@ target_include_directories(player PRIVATE ${LIBVGM_SOURCE_DIR})
 if(MSVC)
 	target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils Iconv::Iconv)
 else()
-	target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils)
+	target_link_libraries(player PRIVATE vgm-audio vgm-player vgm-utils iconv)
 endif()
 if(USE_SANITIZERS)
 	add_sanitizers(player)

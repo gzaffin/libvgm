@@ -30,7 +30,6 @@
 #include <xaudio2fx.h>
 #include <x3daudio.h>
 #include <xapofx.h>
-#pragma comment(lib,"xaudio2.lib")
 
 #include <mmsystem.h>	// for WAVEFORMATEX
 
@@ -247,7 +246,7 @@ UINT8 XAudio2_Init(void)
 	//
 	winrt::com_ptr<::IXAudio2> pXAudio2;
 
-	retVal = XAudio2Create(pXAudio2.put(), flags);
+	retVal = XAudio2Create(pXAudio2.put(), flags, XAUDIO2_DEFAULT_PROCESSOR);
 	if (retVal != S_OK)
 	{
 		CoUninitialize();
@@ -481,7 +480,7 @@ UINT8 XAudio2_Start(void* drvObj, UINT32 deviceID, AUDIO_OPTS* options, void* au
 	//
 	// Create a XAudio2
 	//
-	retVal = XAudio2Create(drv->pXAudio2.put(), flags);
+	retVal = XAudio2Create(drv->pXAudio2.put(), flags, XAUDIO2_DEFAULT_PROCESSOR);
 	if (retVal != S_OK) {
 		return AERR_API_ERR;
 	}
