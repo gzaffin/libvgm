@@ -10,7 +10,7 @@ As it can be seen from CMakeLists.txt, the following two packages are required:
 1. libiconv
 2. zlib
 
-A third dependency for Windows audio drivers is Microsoft C++/WinRT, which comes with Visual Studio since Visual Studio installs and manages Microsoft Windows SDK .
+A third dependency for Windows audio drivers is [Microsoft C++/WinRT](https://learn.microsoft.com/en-us/windows/uwp/cpp-and-winrt-apis/), which comes with Visual Studio since Visual Studio installs and manages Microsoft Windows SDK .
 
 Install packages with vcpkg with [vcpkg install <package>...](https://learn.microsoft.com/en-us/vcpkg/commands/install) command
 ```
