@@ -30,7 +30,7 @@ PS C:\<PATH>\libvgm\build>cmake --build . --config Release
 Use MSYS2, pacman, minGW-w64 UCRT64 environment, GNU gcc toolchain, git, ninja, CMake. [Install MSYS2 minGW-w64 UCRT64](https://www.msys2.org/#installation) .  
 Use MSYS2 pacman package manager .  
 
-Add dependency packages intto minGW-w64 UCRT64 environment:
+Add dependency packages to minGW-w64 UCRT64 environment:
 1. libiconv (mingw-w64-ucrt-x86_64-libiconv)
 2. zlib (mingw-w64-ucrt-x86_64-zlib)
 3. cppwinrt (mingw-w64-ucrt-x86_64-cppwinrt)
