@@ -43,7 +43,7 @@
 	DEVID_32X_PWM, DEVID_AY8910, DEVID_GB_DMG, DEVID_NES_APU, DEVID_YMW258, DEVID_uPD7759, DEVID_MSM6258, DEVID_MSM6295,
 	DEVID_K051649, DEVID_K054539, DEVID_C6280, DEVID_C140, DEVID_C219, DEVID_K053260, DEVID_POKEY, DEVID_QSOUND,
 	DEVID_SCSP, DEVID_WSWAN, DEVID_VBOY_VSU, DEVID_SAA1099, DEVID_ES5503, DEVID_ES5506, DEVID_X1_010, DEVID_C352,
-	DEVID_GA20, DEVID_MIKEY, DEVID_K007232, DEVID_K005289, DEVID_MSM5205, DEVID_MSM5232, 
+	DEVID_GA20, DEVID_MIKEY, DEVID_K007232, DEVID_K005289, DEVID_MSM5205, DEVID_MSM5232, DEVID_BSMT2000, DEVID_ICS2115,
 };
 
 /*static*/ const DEV_ID VGMPlayer::_DEV_LIST[_CHIP_COUNT] =
@@ -53,7 +53,7 @@
 	DEVID_RF5C68, DEVID_32X_PWM, DEVID_AY8910, DEVID_GB_DMG, DEVID_NES_APU, DEVID_YMW258, DEVID_uPD7759, DEVID_MSM6258,
 	DEVID_MSM6295, DEVID_K051649, DEVID_K054539, DEVID_C6280, DEVID_C140, DEVID_K053260, DEVID_POKEY, DEVID_QSOUND,
 	DEVID_SCSP, DEVID_WSWAN, DEVID_VBOY_VSU, DEVID_SAA1099, DEVID_ES5503, DEVID_ES5506, DEVID_X1_010, DEVID_C352,
-	DEVID_GA20, DEVID_MIKEY, DEVID_K007232, DEVID_K005289, DEVID_MSM5205, DEVID_MSM5232, 
+	DEVID_GA20, DEVID_MIKEY, DEVID_K007232, DEVID_K005289, DEVID_MSM5205, DEVID_MSM5232, DEVID_BSMT2000, DEVID_ICS2115, 
 };
 
 /*static*/ const UINT32 VGMPlayer::_CHIPCLK_OFS[_CHIP_COUNT] =
@@ -63,7 +63,7 @@
 	0x6C, 0x70, 0x74, 0x80, 0x84, 0x88, 0x8C, 0x90,
 	0x98, 0x9C, 0xA0, 0xA4, 0xA8, 0xAC, 0xB0, 0xB4,
 	0xB8, 0xC0, 0xC4, 0xC8, 0xCC, 0xD0, 0xD8, 0xDC,
-	0xE0, 0xE4, 0xE8, 0xEC, 0xF0, 0xF4, 
+	0xE0, 0xE4, 0xE8, 0xEC, 0xF0, 0xF4, 0xF8, 0xFC,
 };
 /*static*/ const UINT16 VGMPlayer::_CHIP_VOLUME[_CHIP_COUNT] =
 {	0x80, 0x200, 0x100, 0x100, 0x180, 0xB0, 0x100, 0x80,
@@ -71,7 +71,7 @@
 	0x80, 0xE0, 0x100, 0xC0, 0x100, 0x40, 0x11E, 0x1C0,
 	0x100, 0xA0, 0x100, 0x100, 0x100, 0x100, 0x100, 0x100,
 	0x20, 0x100, 0x100, 0x100, 0x40, 0x20, 0x100, 0x40,
-	0x280, 0x100, 0x100, 0x100, 0x100, 0x100, 
+	0x280, 0x100, 0x100, 0x100, 0x100, 0x100, 0x200, 0x800, 
 };
 /*static*/ const UINT16 VGMPlayer::_PB_VOL_AMNT[_CHIP_COUNT] =
 {	0x100, 0x80, 0x100, 0x100, 0x100, 0x100, 0x100, 0x100,
@@ -79,7 +79,7 @@
 	0x200, 0x100, 0x200, 0x400, 0x200, 0x400, 0x100, 0x200,
 	0x200, 0x100, 0x100, 0x100, 0x180, 0x100, 0x100, 0x100,
 	0x800, 0x100, 0x100, 0x100, 0x800, 0x1000, 0x100, 0x800,
-	0x100, 0x200, 0x100, 0x100, 0x200, 0x100, 
+	0x100, 0x200, 0x100, 0x100, 0x200, 0x100, 0x100, 0x40, 
 };
 
 /*static*/ const char* const VGMPlayer::_TAG_TYPE_LIST[_TAG_COUNT] =
@@ -560,7 +560,7 @@ UINT8 VGMPlayer::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 		PLR_DEV_INFO devInf;
 		
 		// chip configuration from VGM header
-		memset(&devInf, 0x00, sizeof(PLR_DEV_INFO));
+		//memset(&devInf, 0x00, sizeof(PLR_DEV_INFO));
 		devInf.type = sdCfg.type;
 		devInf.id = (UINT32)sdCfg.deviceID;
 		devInf.instance = (UINT8)sdCfg.instance;
@@ -569,10 +569,29 @@ UINT8 VGMPlayer::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 		{
 			// when playing, get information from device structures (may feature modified volume levels)
 			const VGM_BASEDEV* clDev = &cDev->base;
+			UINT32 curLDev;
+			
 			devInf.devDecl = clDev->defInf.devDecl;
 			devInf.core = (clDev->defInf.devDef != NULL) ? clDev->defInf.devDef->coreID : 0x00;
 			devInf.volume = (clDev->resmpl.volumeL + clDev->resmpl.volumeR) / 2;
 			devInf.smplRate = clDev->defInf.sampleRate;
+			
+			for (curLDev = 0, clDev = clDev->linkDev; curLDev < cDev->base.defInf.linkDevCount && clDev != NULL; curLDev ++, clDev = clDev->linkDev)
+			{
+				const DEVLINK_INFO* dLink = &cDev->base.defInf.linkDevs[curLDev];
+				PLR_DEV_INFO lDevInf;
+				
+				//memset(&lDevInf, 0x00, sizeof(PLR_DEV_INFO));
+				lDevInf.type = dLink->devID;
+				lDevInf.id = (UINT32)sdCfg.deviceID;
+				lDevInf.instance = 0xFF;
+				lDevInf.devCfg = dLink->cfg;
+				lDevInf.devDecl = clDev->defInf.devDecl;
+				lDevInf.core = (clDev->defInf.devDef != NULL) ? clDev->defInf.devDef->coreID : 0x00;
+				lDevInf.volume = (clDev->resmpl.volumeL + clDev->resmpl.volumeR) / 2;
+				lDevInf.smplRate = clDev->defInf.sampleRate;
+				devInf.devLink.push_back(lDevInf);
+			}
 		}
 		else
 		{
@@ -580,6 +599,27 @@ UINT8 VGMPlayer::GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const
 			devInf.core = 0x00;
 			devInf.volume = GetChipVolume(sdCfg.vgmChipType, sdCfg.instance, 0);
 			devInf.smplRate = 0;
+			
+			const DEVLINK_IDS* dlIds = devInf.devDecl->linkDevIDs(dCfg);
+			if (dlIds != NULL && dlIds->devCount > 0)
+			{
+				size_t curLDev;
+				for (curLDev = 0; curLDev < dlIds->devCount; curLDev ++)
+				{
+					PLR_DEV_INFO lDevInf;
+					
+					//memset(&lDevInf, 0x00, sizeof(PLR_DEV_INFO));
+					lDevInf.type = dlIds->devIDs[curLDev];
+					lDevInf.id = (UINT32)sdCfg.deviceID;
+					lDevInf.instance = 0xFF;
+					lDevInf.devDecl = SndEmu_GetDevDecl(lDevInf.type, _userDevList, _devStartOpts);
+					lDevInf.devCfg = NULL;
+					lDevInf.core = 0x00;
+					lDevInf.volume = GetChipVolume(sdCfg.vgmChipType, sdCfg.instance, 1);
+					lDevInf.smplRate = 0;
+					devInf.devLink.push_back(lDevInf);
+				}
+			}
 		}
 		devInfList.push_back(devInf);
 	}
@@ -1549,6 +1589,15 @@ void VGMPlayer::InitDevices(void)
 			if (retVal)
 				break;
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D16, 0, (void**)&chipDev.writeD16);
+			SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, (void**)&chipDev.romWrite);
+			break;
+		case DEVID_BSMT2000:
+			retVal = SndEmu_Start2(chipType, devCfg, devInf, _userDevList, _devStartOpts);
+			if (retVal)
+				break;
+			SndEmu_GetDeviceFunc(devInf->devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, (void**)&chipDev.write8);
+			SndEmu_GetDeviceFunc(devInf->devDef, RWF_REGISTER | RWF_QUICKWRITE, DEVRW_A8D16, 0, (void**)&chipDev.writeD16);
+			SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 0, (void**)&chipDev.romSize);
 			SndEmu_GetDeviceFunc(devInf->devDef, RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, (void**)&chipDev.romWrite);
 			break;
 		default:
