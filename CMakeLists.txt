@@ -12,6 +12,7 @@ endif()
 
 project(libvgmMain VERSION 0.1 LANGUAGES C CXX)
 
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/cmake_modules/")
@@ -128,6 +129,7 @@ option(BUILD_PLAYER "build player application" ON)
 option(BUILD_VGM2WAV "build sample vgm2wav application" ON)
 set(LIBRARY_TYPE "STATIC" CACHE STRING "library build type (static/shared)")
 set_property(CACHE LIBRARY_TYPE PROPERTY STRINGS "SHARED;STATIC")
+option(REALLY_NEED_CXX14 "I really need C++14" OFF)
 option(USE_SANITIZERS "use sanitizers" ON)
 
 
