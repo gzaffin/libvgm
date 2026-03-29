@@ -6,6 +6,8 @@
 #ifdef _WIN32
 //#define _WIN32_WINNT	0x500	// for GetConsoleWindow()
 #include <windows.h>
+#include <wchar.h>
+#include <locale.h>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
@@ -46,7 +48,15 @@ extern "C" int __cdecl _kbhit(void);
 
 //#define USE_MEMORY_LOADER 1	// define to use the in-memory loader
 
+#ifdef _MSC_VER
+bool isLikelyUTF8(const wchar_t *wstr);
+bool isLikelyUTF16(const char *str);
+int wmain(int argc, wchar_t* argv[]);
+
+#else // _MSC_VER
 int main(int argc, char* argv[]);
+
+#endif // _MSC_VER
 static void DoChipControlMode(PlayerBase* player);
 static void StripNewline(char* str);
 static std::string FCC2Str(UINT32 fcc);
@@ -98,14 +108,24 @@ static UINT8 pbTimeMode = PLAYTIME_LOOP_INCL | PLAYTIME_TIME_FILE;
 
 static PlayerA mainPlr;
 
+#ifdef _MSC_VER
+int wmain(int argc, wchar_t* argv[])
+{
+	// Set the locale to support UTF-8 output in console
+	setlocale(LC_ALL, ".UTF8");
+
+#else // _MSC_VER
 int main(int argc, char* argv[])
 {
+
+#endif // _MSC_VER
+
 	int argbase;
 	UINT8 retVal;
 	DATA_LOADER *dLoad;
 	int curSong;
 	bool needRefresh;
-	
+
 	if (argc < 2)
 	{
 		printf("Usage: %s inputfile\n", argv[0]);
@@ -113,9 +133,10 @@ int main(int argc, char* argv[])
 	}
 	argbase = 1;
 #ifdef _WIN32
-	SetConsoleOutputCP(65001);	// set UTF-8 codepage
+	SetConsoleOutputCP(65001);	// Set Windows Console output to UTF-8
+	SetConsoleCP(65001);	// Set input to UTF-8 as well
 #endif
-	
+
 	retVal = InitAudioSystem();
 	if (retVal)
 		return 1;
@@ -126,7 +147,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	playState = 0x00;
-	
+
 	// I'll keep the instances of the players for the program's life time.
 	// This way player/chip options are kept between track changes.
 	mainPlr.RegisterPlayerEngine(new VGMPlayer);
@@ -147,18 +168,97 @@ int main(int argc, char* argv[])
 		mainPlr.SetConfiguration(pCfg);
 	}
 
+#ifdef DEBUG
+	for (int i = 0; i < argc; i++) {
+
+#ifdef _MSC_VER
+		// Convert to UTF-8
+		int utf8Len = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, NULL, 0, NULL, NULL);
+		char *utf8 = (char *)malloc(utf8Len);
+		WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, utf8, utf8Len, NULL, NULL);
+
+		printf("As UTF-8 bytes: ");
+		for (int j = 0; j < utf8Len - 1; j++) printf("%02X ", (unsigned char)utf8[j]);
+		printf("\nAs UTF-8 string: %s\n", utf8);
+
+		// Convert to ANSI
+		int ansiLen = WideCharToMultiByte(CP_ACP, 0, argv[i], -1, NULL, 0, NULL, NULL);
+		char *ansi = (char *)malloc(ansiLen);
+		WideCharToMultiByte(CP_ACP, 0, argv[i], -1, ansi, ansiLen, NULL, NULL);
+
+		printf("As ANSI string: %s\n", ansi);
+
+		// Detect likely UTF-8 origin
+		bool check_UTF_8 = isLikelyUTF8(argv[i]);
+
+		printf("Likely UTF-8 originally? %s\n", (check_UTF_8) ? "Yes" : "No");
+		char *playfile = (check_UTF_8) ? utf8 : ansi;
+
+		/*free(utf8);*/
+		/*free(ansi);*/
+
+		char *playfile = argv[optind];
+
+		printf("Filename : %s\n", playfile);
+
+		free(utf8);
+		free(ansi);
+
+#else // _MSC_VER
+		printf("Filename : %s\n", playfile);
+
+#endif // _MSC_VER
+
+	}
+
+#endif // DEBUG
+
+#ifdef _MSC_VER
+	char** argv_windows_UTF8 = (char**)malloc(sizeof(char*) * argc);
+	for (int i = 0; i < argc; i++) {
+
+		// Convert to ANSI
+		int utf8Len = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, NULL, 0, NULL, NULL);
+		char *utf8 = (char *)malloc(utf8Len);
+		WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, utf8, utf8Len, NULL, NULL);
+
+#ifdef DEBUG
+		printf("\nAs UTF-8 string: %s\n", utf8);
+
+#endif // DEBUG
+
+		/*free(ansi);*/
+		argv_windows_UTF8[i] = utf8;
+	}
+
+#endif // _MSC_VER
+
 	for (curSong = argbase; curSong < argc; curSong ++)
 	{
-	
+
+#ifdef _MSC_VER
+	printf("Loading %s ...  ", GetFileTitle(argv_windows_UTF8[curSong]));
+
+#else // _MSC_VER
 	printf("Loading %s ...  ", GetFileTitle(argv[curSong]));
+
+#endif // _MSC_VER
+
 	fflush(stdout);
 
 #ifdef USE_MEMORY_LOADER
 	UINT32 fileSize;
+#ifdef _MSC_VER
+	UINT8 *fileData = SlurpFile(argv_windows_UTF8[curSong],&fileSize);
+
+#else // _MSC_VER
 	UINT8 *fileData = SlurpFile(argv[curSong],&fileSize);
+
+#endif // _MSC_VER
+
 	dLoad = MemoryLoader_Init(fileData, fileSize);
 #else
-	dLoad = FileLoader_Init(argv[curSong]);
+	dLoad = FileLoader_Init(argv_windows_UTF8[curSong]);
 #endif
 
 	if(dLoad == NULL) continue;
@@ -177,14 +277,14 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Error 0x%02X loading file!\n", retVal);
 		continue;
 	}
-	
+
 	PlayerBase* player = mainPlr.GetPlayer();
 	mainPlr.SetLoopCount(maxLoops);
 	if (player->GetPlayerType() == FCC_S98)
 	{
 		S98Player* s98play = dynamic_cast<S98Player*>(player);
 		const S98_HEADER* s98hdr = s98play->GetFileHeader();
-		
+
 		printf("S98 v%u, Total Length: %.2f s, Loop Length: %.2f s, Tick Rate: %u/%u", s98hdr->fileVer,
 				player->Tick2Second(player->GetTotalTicks()), player->Tick2Second(player->GetLoopTicks()),
 				s98hdr->tickMult, s98hdr->tickDiv);
@@ -193,7 +293,7 @@ int main(int argc, char* argv[])
 	{
 		VGMPlayer* vgmplay = dynamic_cast<VGMPlayer*>(player);
 		const VGM_HEADER* vgmhdr = vgmplay->GetFileHeader();
-		
+
 		printf("VGM v%3X, Total Length: %.2f s, Loop Length: %.2f s", vgmhdr->fileVer,
 				player->Tick2Second(player->GetTotalTicks()), player->Tick2Second(player->GetLoopTicks()));
 		mainPlr.SetLoopCount(vgmplay->GetModifiedLoopCount(maxLoops));
@@ -203,7 +303,7 @@ int main(int argc, char* argv[])
 		DROPlayer* droplay = dynamic_cast<DROPlayer*>(player);
 		const DRO_HEADER* drohdr = droplay->GetFileHeader();
 		const char* hwType;
-		
+
 		if (drohdr->hwType == 0)
 			hwType = "OPL2";
 		else if (drohdr->hwType == 1)
@@ -215,7 +315,7 @@ int main(int argc, char* argv[])
 		printf("DRO v%u, Total Length: %.2f s, HW Type: %s", drohdr->verMajor,
 				player->Tick2Second(player->GetTotalTicks()), hwType);
 	}
-	
+
 	if (showTags > 0)
 	{
 		const char* songTitle = NULL;
@@ -224,7 +324,7 @@ int main(int argc, char* argv[])
 		const char* songSystem = NULL;
 		const char* songDate = NULL;
 		const char* songComment = NULL;
-	
+
 		const char* const* tagList = player->GetTags();
 		for (const char* const* t = tagList; *t; t += 2)
 		{
@@ -241,7 +341,7 @@ int main(int argc, char* argv[])
 			else if (!strcmp(t[0], "COMMENT"))
 				songComment = t[1];
 		}
-		
+
 		if (songTitle != NULL && songTitle[0] != '\0')
 			printf("\nSong Title: %s", songTitle);
 		if (showTags >= 2)
@@ -258,13 +358,13 @@ int main(int argc, char* argv[])
 				printf("\nSong Comment: %s", songComment);
 		}
 	}
-	
+
 	putchar('\n');
-	
+
 	{
 		PLR_DEV_OPTS devOpts;
 		UINT32 devOptID;
-		
+
 		devOptID = PLR_DEV_ID(DEVID_SN76496, 0);
 		retVal = player->GetDeviceOptions(devOptID, devOpts);
 		if (! (retVal & 0x80))
@@ -275,7 +375,7 @@ int main(int argc, char* argv[])
 			memcpy(devOpts.panOpts.chnPan, panPos, sizeof(panPos));
 			player->SetDeviceOptions(devOptID, devOpts);
 		}
-		
+
 		devOptID = PLR_DEV_ID(DEVID_YM2413, 0);
 		retVal = player->GetDeviceOptions(devOptID, devOpts);
 		if (! (retVal & 0x80))
@@ -286,7 +386,7 @@ int main(int argc, char* argv[])
 			memcpy(devOpts.panOpts.chnPan, panPos, sizeof(panPos));
 			player->SetDeviceOptions(devOptID, devOpts);
 		}
-		
+
 		devOptID = PLR_DEV_ID(DEVID_AY8910, 0);
 		retVal = player->GetDeviceOptions(devOptID, devOpts);
 		if (! (retVal & 0x80))
@@ -305,16 +405,16 @@ int main(int argc, char* argv[])
 			player->SetDeviceOptions(devOptID, devOpts);
 		}
 	}
-	
+
 	mainPlr.Start();
-	
+
 	if (showFileInfo)
 	{
 		// only after calling PlayerA::Start() we can obtain info about the currently used sound cores
 		PLR_SONG_INFO sInf;
 		std::vector<PLR_DEV_INFO> diList;
 		size_t curDev;
-		
+
 		player->GetSongInfo(sInf);
 		player->GetSongDeviceInfo(diList);
 		printf("SongInfo: %s v%X.%02X, Rate %u/%u, Len %u, Loop at %d, devices: %u\n",
@@ -353,9 +453,9 @@ int main(int argc, char* argv[])
 		VGMPlayer* vgmplay = dynamic_cast<VGMPlayer*>(player);
 		vgmPcmStrms = &vgmplay->GetStreamDevInfo();
 	}
-	
+
 	StartDiskWriter("waveOut.wav");
-	
+
 	if (audDrv != NULL)
 		retVal = AudioDrv_SetCallback(audDrv, FillBuffer, &mainPlr);
 	else
@@ -373,7 +473,7 @@ int main(int argc, char* argv[])
 		if (needRefresh)
 		{
 			const char* pState;
-			
+
 			if (playState & PLAYSTATE_PAUSE)
 				pState = "Paused";
 			else if (mainPlr.GetState() & PLAYSTATE_END)
@@ -404,7 +504,7 @@ int main(int argc, char* argv[])
 			fflush(stdout);
 			needRefresh = false;
 		}
-		
+
 		if (manualRenderLoop && ! (playState & PLAYSTATE_PAUSE))
 		{
 			UINT32 wrtBytes = FillBuffer(audDrvLog, &mainPlr, (UINT32)locAudBuf.size(), &locAudBuf[0]);
@@ -414,12 +514,12 @@ int main(int argc, char* argv[])
 		{
 			Sleep(50);
 		}
-		
+
 		if (_kbhit())
 		{
 			int inkey = _getch();
 			int letter = toupper(inkey);
-			
+
 			if (letter == ' ' || letter == 'P')
 			{
 				playState ^= PLAYSTATE_PAUSE;
@@ -442,7 +542,7 @@ int main(int argc, char* argv[])
 				UINT32 maxPos;
 				UINT8 pbPos10;
 				UINT32 destPos;
-				
+
 				OSMutex_Lock(renderMtx);
 				maxPos = mainPlr.GetPlayer()->GetTotalPlayTicks(maxLoops);
 				pbPos10 = letter - '0';
@@ -494,30 +594,38 @@ int main(int argc, char* argv[])
 	// also waits for render thread to finish its work
 	if (audDrv != NULL)
 		AudioDrv_SetCallback(audDrv, NULL, NULL);
-	
+
 	StopDiskWriter();
-	
+
 	mainPlr.Stop();
 	mainPlr.UnloadFile();
 	DataLoader_Deinit(dLoad);	dLoad = NULL;
 #ifdef USE_MEMORY_LOADER
 	free(fileData);
 #endif
-	
+
 	}	// end for(curSong)
-	
+
+#ifdef _MSC_VER
+	for (int i = 0; i < argc; i++) {
+		free(argv_windows_UTF8[i]);
+	}
+	free(argv_windows_UTF8);
+
+#endif // _MSC_VER
+
 	mainPlr.UnregisterAllPlayers();
-	
+
 	StopAudioDevice();
 	DeinitAudioSystem();
 	printf("Done.\n");
-	
+
 #if defined(_DEBUG) && (_MSC_VER >= 1400)
 	// doesn't work well with C++ containers
 	//if (_CrtDumpMemoryLeaks())
 	//	_getch();
 #endif
-	
+
 	return 0;
 }
 
@@ -567,7 +675,7 @@ static void DoChipControlMode(PlayerBase* player)
 	char* endPtr;
 	int chipID;
 	UINT8 retVal;
-	
+
 	printf("Command Mode. ");
 	mode = 0;	// start
 	chipID = -1;
@@ -576,7 +684,7 @@ static void DoChipControlMode(PlayerBase* player)
 		if (mode == 0)
 		{
 			PLR_DEV_OPTS devOpts;
-			
+
 			// number (sound chip ID) / D (display) / P (player options)
 			printf("Sound Chip ID: ");
 			endPtr = fgets(line, 0x80, stdin);
@@ -585,7 +693,7 @@ static void DoChipControlMode(PlayerBase* player)
 			StripNewline(line);
 			if (line[0] == '\0')
 				return;
-			
+
 			// Note: In MSVC 2010, strtol returns 0x7FFFFFFF for the string "0x8000000C".
 			// strtoul returns the correct value and also properly returns -1 for "-1".
 			chipID = (int)strtoul(line, &endPtr, 0);
@@ -597,7 +705,7 @@ static void DoChipControlMode(PlayerBase* player)
 					printf("Invalid sound chip ID.\n");
 					continue;
 				}
-				
+
 				printf("Cfg: Core %s, Opts 0x%X, srMode 0x%02X, sRate %u, resampleMode 0x%02X\n",
 					FCC2Str(devOpts.emuCore[0]).c_str(), devOpts.coreOpts, devOpts.srMode,
 					devOpts.smplRate, devOpts.resmplMode);
@@ -666,26 +774,26 @@ static void DoChipControlMode(PlayerBase* player)
 		{
 			char* tokenStr;
 			PLR_DEV_OPTS devOpts;
-			
+
 			retVal = player->GetDeviceOptions((UINT32)chipID, devOpts);
 			if (retVal & 0x80)
 			{
 				mode = 0;
 				continue;
 			}
-			
+
 			// Core / Linked Core / Opts / SRMode / SampleRate / ReSampleMode / Muting
 			printf("Command [C/LC/O/SRM/SR/RSM/M data]: ");
 			endPtr = fgets(line, 0x80, stdin);
 			if (endPtr == NULL)
 				return;
 			StripNewline(line);
-			
+
 			tokenStr = strtok(line, " ");
 			for (endPtr = line; *endPtr != '\0'; endPtr ++)
 				*endPtr = (char)toupper((unsigned char)*endPtr);
 			tokenStr = endPtr + 1;
-			
+
 			if (! strcmp(line, "C"))
 			{
 				std::string fccStr(tokenStr);
@@ -731,7 +839,7 @@ static void DoChipControlMode(PlayerBase* player)
 			else if (! strcmp(line, "M"))
 			{
 				PLR_MUTE_OPTS& muteOpts = devOpts.muteOpts;
-				
+
 				letter = '\0';
 				tokenStr = strtok(NULL, ",");
 				while(tokenStr != NULL)
@@ -751,10 +859,10 @@ static void DoChipControlMode(PlayerBase* player)
 						if (endPtr > tokenStr)
 							muteOpts.chnMute[0] ^= (1 << chnID);
 					}
-					
+
 					tokenStr = strtok(NULL, ",");
 				}
-				
+
 				player->SetDeviceMuting((UINT32)chipID, muteOpts);
 				printf("-> Chip %s [0x%02X], Channel Mask: 0x%02X\n",
 					(muteOpts.disable & 0x01) ? "Off" : "On", muteOpts.disable, muteOpts.chnMute[0]);
@@ -764,7 +872,7 @@ static void DoChipControlMode(PlayerBase* player)
 				PLR_PAN_OPTS& panOpts = devOpts.panOpts;
 				UINT32 chnID;
 				UINT32 curChn;
-				
+
 				letter = '\0';
 				tokenStr = strtok(NULL, ",");
 				chnID = 0;
@@ -773,11 +881,11 @@ static void DoChipControlMode(PlayerBase* player)
 					double panPos = strtod(tokenStr, &endPtr);
 					if (endPtr > tokenStr)
 						panOpts.chnPan[0][chnID] = (INT16)(panPos * 0x100);
-					
+
 					tokenStr = strtok(NULL, ",");
 					chnID ++;
 				}
-				
+
 				player->SetDeviceOptions((UINT32)chipID, devOpts);
 				printf("-> Panning: ");
 				for (curChn = 0; curChn < chnID; curChn ++)
@@ -798,20 +906,20 @@ static void DoChipControlMode(PlayerBase* player)
 				DROPlayer* droplay = dynamic_cast<DROPlayer*>(player);
 				DRO_PLAY_OPTIONS playOpts;
 				char* tokenStr;
-				
+
 				droplay->GetPlayerOptions(playOpts);
-				
+
 				printf("Command [SPD/OPL3 data]: ");
 				endPtr = fgets(line, 0x80, stdin);
 				if (endPtr == NULL)
 					return;
 				StripNewline(line);
-				
+
 				tokenStr = strtok(line, " ");
 				for (endPtr = line; *endPtr != '\0'; endPtr ++)
 					*endPtr = (char)toupper((unsigned char)*endPtr);
 				tokenStr = endPtr + 1;
-				
+
 				if (! strcmp(line, "SPD"))
 				{
 					double spd = strtod(tokenStr, &endPtr);
@@ -835,20 +943,20 @@ static void DoChipControlMode(PlayerBase* player)
 				S98Player* s98play = dynamic_cast<S98Player*>(player);
 				S98_PLAY_OPTIONS playOpts;
 				char* tokenStr;
-				
+
 				s98play->GetPlayerOptions(playOpts);
-				
+
 				printf("Command [SPD data]: ");
 				endPtr = fgets(line, 0x80, stdin);
 				if (endPtr == NULL)
 					return;
 				StripNewline(line);
-				
+
 				tokenStr = strtok(line, " ");
 				for (endPtr = line; *endPtr != '\0'; endPtr ++)
 					*endPtr = (char)toupper((unsigned char)*endPtr);
 				tokenStr = endPtr + 1;
-				
+
 				if (! strcmp(line, "SPD"))
 				{
 					double spd = strtod(tokenStr, &endPtr);
@@ -866,20 +974,20 @@ static void DoChipControlMode(PlayerBase* player)
 				VGMPlayer* vgmplay = dynamic_cast<VGMPlayer*>(player);
 				VGM_PLAY_OPTIONS playOpts;
 				char* tokenStr;
-				
+
 				vgmplay->GetPlayerOptions(playOpts);
-				
+
 				printf("Command [SPD/PHZ/HSO data]: ");
 				endPtr = fgets(line, 0x80, stdin);
 				if (endPtr == NULL)
 					return;
 				StripNewline(line);
-				
+
 				tokenStr = strtok(line, " ");
 				for (endPtr = line; *endPtr != '\0'; endPtr ++)
 					*endPtr = (char)toupper((unsigned char)*endPtr);
 				tokenStr = endPtr + 1;
-				
+
 				if (! strcmp(line, "SPD"))
 				{
 					double spd = strtod(tokenStr, &endPtr);
@@ -909,20 +1017,20 @@ static void DoChipControlMode(PlayerBase* player)
 				GYMPlayer* gymplay = dynamic_cast<GYMPlayer*>(player);
 				GYM_PLAY_OPTIONS playOpts;
 				char* tokenStr;
-				
+
 				gymplay->GetPlayerOptions(playOpts);
-				
+
 				printf("Command [SPD data]: ");
 				endPtr = fgets(line, 0x80, stdin);
 				if (endPtr == NULL)
 					return;
 				StripNewline(line);
-				
+
 				tokenStr = strtok(line, " ");
 				for (endPtr = line; *endPtr != '\0'; endPtr ++)
 					*endPtr = (char)toupper((unsigned char)*endPtr);
 				tokenStr = endPtr + 1;
-				
+
 				if (! strcmp(line, "SPD"))
 				{
 					double spd = strtod(tokenStr, &endPtr);
@@ -944,19 +1052,19 @@ static void DoChipControlMode(PlayerBase* player)
 		else if (mode == 10)	// display configuration mode
 		{
 			char* tokenStr;
-			
+
 			// Tags / FileInfo
 			printf("Command [T/FI/LL/TD data]: ");
 			endPtr = fgets(line, 0x80, stdin);
 			if (endPtr == NULL)
 				return;
 			StripNewline(line);
-			
+
 			tokenStr = strtok(line, " ");
 			for (endPtr = line; *endPtr != '\0'; endPtr ++)
 				*endPtr = (char)toupper((unsigned char)*endPtr);
 			tokenStr = endPtr + 1;
-			
+
 			if (! strcmp(line, "T") || ! strcmp(line, "FI"))
 			{
 				int val = (int)strtol(tokenStr, &endPtr, 0);
@@ -998,22 +1106,22 @@ static void DoChipControlMode(PlayerBase* player)
 				mode = 0;
 		}
 	}
-	
+
 	return;
 }
 
 static void StripNewline(char* str)
 {
 	char* strPtr;
-	
+
 	strPtr = str;
 	while(*strPtr != '\0')
 		strPtr ++;
-	
+
 	while(strPtr > str && iscntrl((unsigned char)strPtr[-1]))
 		strPtr --;
 	*strPtr = '\0';
-	
+
 	return;
 }
 
@@ -1030,8 +1138,26 @@ static std::string FCC2Str(UINT32 fcc)
 
 static UINT8 *SlurpFile(const char *fileName, UINT32 *fileSize)
 {
+
 	*fileSize = 0;
-	FILE *hFile = fopen(fileName,"rb");
+	FILE *hFile;
+
+#ifdef _MSC_VER
+	if (isLikelyUTF16(fileName)) {
+		int utf16Len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, fileName, -1, NULL, 0);
+			wchar_t *utf16 = (wchar_t *)malloc(utf16Len * sizeof(wchar_t));
+		MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, fileName, -1, utf16, utf16Len);
+
+		hFile = _wfopen(utf16, L"rb"); // Write mode, UTF-16 encoding
+		free(utf16);
+	} else {
+		hFile = fopen(fileName, "rb");
+	}
+
+#else // _MSC_VER
+	hFile = fopen(fileName,"rb");
+
+#endif // _MSC_VER
 	UINT32 hFileSize;
 	UINT8 *fileData;
 	if(hFile == NULL) return NULL;
@@ -1059,12 +1185,12 @@ static const char* GetFileTitle(const char* filePath)
 {
 	const char* dirSep1;
 	const char* dirSep2;
-	
+
 	dirSep1 = strrchr(filePath, '/');
 	dirSep2 = strrchr(filePath, '\\');
 	if (dirSep2 > dirSep1)
 		dirSep1 = dirSep2;
-	
+
 	return (dirSep1 == NULL) ? filePath : (dirSep1 + 1);
 }
 
@@ -1077,12 +1203,12 @@ static UINT32 FillBuffer(void* drvStruct, void* userParam, UINT32 bufSize, void*
 		memset(data, 0x00, bufSize);
 		return bufSize;
 	}
-	
+
 	UINT32 renderedBytes;
 	OSMutex_Lock(renderMtx);
 	renderedBytes = myPlr.Render(bufSize, data);
 	OSMutex_Unlock(renderMtx);
-	
+
 	return renderedBytes;
 }
 
@@ -1151,13 +1277,13 @@ static UINT32 GetNthAudioDriver(UINT8 adrvType, INT32 drvNumber)
 	//	-2 - select last found driver
 	if (drvNumber == -1)
 		return (UINT32)-1;
-	
+
 	UINT32 drvCount;
 	UINT32 curDrv;
 	INT32 typedDrv;
 	UINT32 lastDrv;
 	AUDDRV_INFO* drvInfo;
-	
+
 	// go through all audio drivers get the ID of the requested Output/Disk Writer driver
 	drvCount = Audio_GetDriverCount();
 	lastDrv = (UINT32)-1;
@@ -1172,7 +1298,7 @@ static UINT32 GetNthAudioDriver(UINT8 adrvType, INT32 drvNumber)
 			typedDrv ++;
 		}
 	}
-	
+
 	if (drvNumber == -2)
 		return lastDrv;
 	return (UINT32)-1;
@@ -1183,14 +1309,14 @@ static UINT8 InitAudioSystem(void)
 {
 	AUDDRV_INFO* drvInfo;
 	UINT8 retVal;
-	
+
 	retVal = OSMutex_Init(&renderMtx, 0);
-	
+
 	printf("Opening Audio Device ...\n");
 	retVal = Audio_Init();
 	if (retVal == AERR_NODRVS)
 		return retVal;
-	
+
 	idWavOut = GetNthAudioDriver(ADRVTYPE_OUT, AudioOutDrv);
 	idWavOutDev = 0;	// default device
 	if (AudioOutDrv != -1 && idWavOut == (UINT32)-1)
@@ -1200,7 +1326,7 @@ static UINT8 InitAudioSystem(void)
 		return AERR_NODRVS;
 	}
 	idWavWrt = GetNthAudioDriver(ADRVTYPE_DISK, WaveWrtDrv);
-	
+
 	audDrv = NULL;
 	if (idWavOut != (UINT32)-1)
 	{
@@ -1218,7 +1344,7 @@ static UINT8 InitAudioSystem(void)
 			DSound_SetHWnd(AudioDrv_GetDrvData(audDrv), GetDesktopWindow());
 #endif
 	}
-	
+
 	audDrvLog = NULL;
 	if (idWavWrt != (UINT32)-1)
 	{
@@ -1226,14 +1352,14 @@ static UINT8 InitAudioSystem(void)
 		if (retVal)
 			audDrvLog = NULL;
 	}
-	
+
 	return 0x00;
 }
 
 static UINT8 DeinitAudioSystem(void)
 {
 	UINT8 retVal;
-	
+
 	retVal = 0x00;
 	if (audDrv != NULL)
 	{
@@ -1244,9 +1370,9 @@ static UINT8 DeinitAudioSystem(void)
 		AudioDrv_Deinit(&audDrvLog);	audDrvLog = NULL;
 	}
 	Audio_Deinit();
-	
+
 	OSMutex_Deinit(renderMtx);	renderMtx = NULL;
-	
+
 	return retVal;
 }
 
@@ -1257,10 +1383,10 @@ static UINT8 StartAudioDevice(void)
 	UINT32 smplSize;
 	UINT32 smplAlloc;
 	UINT32 localAudBufSize;
-	
+
 	opts = NULL;
 	smplAlloc = 0x00;
-	
+
 	if (audDrv != NULL)
 		opts = AudioDrv_GetOptions(audDrv);
 	else if (audDrvLog != NULL)
@@ -1271,7 +1397,7 @@ static UINT8 StartAudioDevice(void)
 	/*opts->numChannels = 2;*/
 	/*opts->numBitsPerSmpl = 16;*/
 	smplSize = opts->numChannels * opts->numBitsPerSmpl / 8;
-	
+
 	if (audDrv != NULL)
 	{
 		printf("Opening Device %u ...\n", idWavOutDev);
@@ -1281,7 +1407,7 @@ static UINT8 StartAudioDevice(void)
 			fprintf(stderr, "Driver Start Error: %02X\n", retVal);
 			return retVal;
 		}
-		
+
 		smplAlloc = AudioDrv_GetBufferSize(audDrv) / smplSize;
 		localAudBufSize = 0;
 	}
@@ -1290,22 +1416,22 @@ static UINT8 StartAudioDevice(void)
 		smplAlloc = opts->sampleRate / 4;
 		localAudBufSize = smplAlloc * smplSize;
 	}
-	
+
 	locAudBuf.resize(localAudBufSize);
 	mainPlr.SetOutputSettings(opts->sampleRate, opts->numChannels, opts->numBitsPerSmpl, smplAlloc);
-	
+
 	return 0x00;
 }
 
 static UINT8 StopAudioDevice(void)
 {
 	UINT8 retVal;
-	
+
 	retVal = 0x00;
 	if (audDrv != NULL)
 		retVal = AudioDrv_Stop(audDrv);
 	locAudBuf.clear();
-	
+
 	return retVal;
 }
 
@@ -1313,14 +1439,14 @@ static UINT8 StartDiskWriter(const char* fileName)
 {
 	AUDIO_OPTS* opts;
 	UINT8 retVal;
-	
+
 	if (audDrvLog == NULL)
 		return 0x00;
-	
+
 	opts = AudioDrv_GetOptions(audDrvLog);
 	if (audDrv != NULL)
 		*opts = *AudioDrv_GetOptions(audDrv);
-	
+
 	WavWrt_SetFileName(AudioDrv_GetDrvData(audDrvLog), fileName);
 	retVal = AudioDrv_Start(audDrvLog, 0);
 	if (! retVal && audDrv != NULL)
@@ -1332,12 +1458,11 @@ static UINT8 StopDiskWriter(void)
 {
 	if (audDrvLog == NULL)
 		return 0x00;
-	
+
 	if (audDrv != NULL)
 		AudioDrv_DataForward_Remove(audDrv, audDrvLog);
 	return AudioDrv_Stop(audDrvLog);
 }
-
 
 #ifndef _WIN32
 static struct termios oldterm;
@@ -1352,7 +1477,7 @@ static void changemode(UINT8 noEcho)
 	}
 	if (termmode == noEcho)
 		return;
-	
+
 	if (noEcho)
 	{
 		struct termios newterm;
@@ -1366,7 +1491,7 @@ static void changemode(UINT8 noEcho)
 		tcsetattr(STDIN_FILENO, TCSANOW, &oldterm);
 		termmode = 0;
 	}
-	
+
 	return;
 }
 
@@ -1374,14 +1499,54 @@ static int _kbhit(void)
 {
 	struct timeval tv;
 	fd_set rdfs;
-	
+
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
-	
+
 	FD_ZERO(&rdfs);
 	FD_SET(STDIN_FILENO, &rdfs);
 	select(STDIN_FILENO + 1, &rdfs, NULL, NULL, &tv);
-	
+
 	return FD_ISSET(STDIN_FILENO, &rdfs);;
 }
 #endif
+
+#ifdef _MSC_VER
+// Check if UTF-8 round-trip matches original UTF-16
+bool isLikelyUTF8(const wchar_t *wstr) {
+	int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+	char *utf8 = (char *)malloc(utf8Len);
+	WideCharToMultiByte(CP_UTF8, 0, wstr, -1, utf8, utf8Len, NULL, NULL);
+
+	int wlen2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, NULL, 0);
+	if (wlen2 == 0) { free(utf8); return false; }
+
+	wchar_t *wstr2 = (wchar_t *)malloc(wlen2 * sizeof(wchar_t));
+	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, wstr2, wlen2);
+
+	bool match = (wcscmp(wstr, wstr2) == 0);
+	free(utf8);
+	free(wstr2);
+	return match;
+}
+
+// Check if UTF-16 round-trip matches original UTF-8
+bool isLikelyUTF16(const char *str) {
+	int utf16Len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, NULL, 0);
+	wchar_t *utf16 = (wchar_t *)malloc(utf16Len * sizeof(wchar_t));
+	MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, utf16, utf16Len);
+
+	int len2 = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, NULL, 0, NULL, NULL);
+	if (len2 == 0) { free(utf16); return false; }
+
+	char *str2 = (char *)malloc(len2);
+	WideCharToMultiByte(CP_UTF8, 0, utf16, -1, str2, len2, NULL, NULL);
+
+	bool match = (strcmp(str, str2) == 0);
+	free(utf16);
+	free(str2);
+	return match;
+}
+
+#endif //  _MSC_VER
+
