@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
+#include <windows.h>
+#include <wchar.h>
+#include <locale.h>
 #include <io.h>
 #include <fcntl.h>
 #endif
@@ -93,7 +96,19 @@ fmt_time(double ts);
 static const char *
 extensible_guid_trailer= "\x00\x00\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71";
 
+#ifdef _MSC_VER
+bool isLikelyUTF8(const wchar_t* wstr);
+bool isLikelyUTF16(const char* str);
+
+int wmain(int argc, wchar_t* argv[]) {
+    // Set the locale to support UTF-8 output in console
+    setlocale(LC_ALL, ".UTF8");
+
+#else // _MSC_VER
 int main(int argc, const char *argv[]) {
+
+#endif // _MSC_VER
+
     PlayerA player;
     PlayerBase* plrEngine;
 
@@ -114,6 +129,95 @@ int main(int argc, const char *argv[]) {
     complete = 0.0;
     inc = 0.0;
 
+#ifdef _MSC_VER
+    char** argv_windows_UTF8 = (char**)malloc(sizeof(char*) * argc);
+    for (int i = 0; i < argc; i++) {
+
+        // Convert to ANSI
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, NULL, 0, NULL, NULL);
+        char* utf8 = (char*)malloc(utf8Len);
+        WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, utf8, utf8Len, NULL, NULL);
+
+#ifdef DEBUG
+        printf("\nAs UTF-8 string: %s\n", utf8);
+
+#endif // DEBUG
+
+        /*free(ansi);*/
+        argv_windows_UTF8[i] = utf8;
+    }
+
+    self = *argv_windows_UTF8++;
+    argc--;
+
+    while (argc > 0) {
+        if (str_equals(*argv_windows_UTF8, "--")) {
+            argv_windows_UTF8++;
+            argc--;
+            break;
+        }
+        else if (str_istarts(*argv_windows_UTF8, "--loops")) {
+            c = strchr(*argv_windows_UTF8, '=');
+            if (c != NULL) {
+                s = &c[1];
+            }
+            else {
+                argv_windows_UTF8++;
+                argc--;
+                s = *argv_windows_UTF8;
+            }
+            loops = scan_uint(s);
+            argv_windows_UTF8++;
+            argc--;
+        }
+        else if (str_istarts(*argv_windows_UTF8, "--samplerate")) {
+            c = strchr(*argv_windows_UTF8, '=');
+            if (c != NULL) {
+                s = &c[1];
+            }
+            else {
+                argv_windows_UTF8++;
+                argc--;
+                s = *argv_windows_UTF8;
+            }
+            sample_rate = scan_uint(s);
+            argv_windows_UTF8++;
+            argc--;
+        }
+        else if (str_istarts(*argv_windows_UTF8, "--bps")) {
+            c = strchr(*argv_windows_UTF8, '=');
+            if (c != NULL) {
+                s = &c[1];
+            }
+            else {
+                argv_windows_UTF8++;
+                argc--;
+                s = *argv_windows_UTF8;
+            }
+            bit_depth = scan_uint(s);
+            argv_windows_UTF8++;
+            argc--;
+        }
+        else if (str_istarts(*argv_windows_UTF8, "--fade")) {
+            c = strchr(*argv_windows_UTF8, '=');
+            if (c != NULL) {
+                s = &c[1];
+            }
+            else {
+                argv_windows_UTF8++;
+                argc--;
+                s = *argv_windows_UTF8;
+            }
+            fade_len = strtod(s, NULL);
+            argv_windows_UTF8++;
+            argc--;
+        }
+        else {
+            break;
+        }
+    }
+
+#else // _MSC_VER
     self = *argv++;
     argc--;
 
@@ -179,6 +283,8 @@ int main(int argc, const char *argv[]) {
             break;
         }
     }
+
+#endif // _MSC_VER
 
     if(loops == 0) {
         loops = 2;
@@ -248,15 +354,35 @@ int main(int argc, const char *argv[]) {
         player.SetConfiguration(pCfg);
     }
 
+#ifdef _MSC_VER
+    if (!strcmp(argv_windows_UTF8[1], "-")) {
+        f = stdout;
+        _setmode(_fileno(f), _O_BINARY);	// force binary output mode
+    }
+    else {
+        if (isLikelyUTF16(argv_windows_UTF8[1])) {
+            int utf16Len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, argv_windows_UTF8[1], -1, NULL, 0);
+            wchar_t* utf16 = (wchar_t*)malloc(utf16Len * sizeof(wchar_t));
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, argv_windows_UTF8[1], -1, utf16, utf16Len);
+
+            f = _wfopen(utf16, L"wb"); // Write mode, UTF-16 encoding
+            free(utf16);
+        }
+        else {
+            f = fopen(argv_windows_UTF8[1], "wb");
+        }
+    }
+
+#else // _MSC_VER
     if (!strcmp(argv[1], "-")) {
         f = stdout;
-#ifdef _WIN32
-        _setmode(_fileno(f), _O_BINARY);	// force binary output mode
-#endif
     }
     else {
         f = fopen(argv[1],"wb");
     }
+
+#endif // _MSC_VER
+
     if(f == NULL) {
         fprintf(stderr,"unable to open output file\n");
         return 1;
@@ -266,7 +392,14 @@ int main(int argc, const char *argv[]) {
      * create a FileLoader object - able to read gzip'd
      * files on-the-fly */
 
+#ifdef _MSC_VER
+    loader = FileLoader_Init(argv_windows_UTF8[0]);
+
+#else // _MSC_VER
     loader = FileLoader_Init(argv[0]);
+
+#endif // _MSC_VER
+
     if(loader == NULL) {
         fprintf(stderr,"failed to create FileLoader\n");
         return 1;
@@ -390,6 +523,14 @@ int main(int argc, const char *argv[]) {
     player.UnregisterAllPlayers();
     DataLoader_Deinit(loader);
     fclose(f);
+
+#ifdef _MSC_VER
+    for (int i = 0; i < argc; i++) {
+        free(argv_windows_UTF8[i]);
+    }
+    free(argv_windows_UTF8);
+
+#endif // _MSC_VER
 
     return 0;
 }
@@ -653,3 +794,42 @@ static unsigned int scan_uint(const char *str) {
 
     return num;
 }
+
+#ifdef _MSC_VER
+// Check if UTF-8 round-trip matches original UTF-16
+bool isLikelyUTF8(const wchar_t* wstr) {
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+    char* utf8 = (char*)malloc(utf8Len);
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, utf8, utf8Len, NULL, NULL);
+
+    int wlen2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, NULL, 0);
+    if (wlen2 == 0) { free(utf8); return false; }
+
+    wchar_t* wstr2 = (wchar_t*)malloc(wlen2 * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, wstr2, wlen2);
+
+    bool match = (wcscmp(wstr, wstr2) == 0);
+    free(utf8);
+    free(wstr2);
+    return match;
+}
+
+// Check if UTF-16 round-trip matches original UTF-8
+bool isLikelyUTF16(const char* str) {
+    int utf16Len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, NULL, 0);
+    wchar_t* utf16 = (wchar_t*)malloc(utf16Len * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, utf16, utf16Len);
+
+    int len2 = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, NULL, 0, NULL, NULL);
+    if (len2 == 0) { free(utf16); return false; }
+
+    char* str2 = (char*)malloc(len2);
+    WideCharToMultiByte(CP_UTF8, 0, utf16, -1, str2, len2, NULL, NULL);
+
+    bool match = (strcmp(str, str2) == 0);
+    free(utf16);
+    free(str2);
+    return match;
+}
+
+#endif //  _MSC_VER
