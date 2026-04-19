@@ -72,7 +72,7 @@ if(MSVC)
 
 	if(NOT MSVC_VERSION LESS 1400)
 		# Note: CMake 3.12 and up have add_compile_options()
-		add_definitions("-D _CRT_SECURE_NO_WARNINGS")
+		add_definitions("/D_CRT_SECURE_NO_WARNINGS")
 	endif()
 endif()
 
@@ -88,7 +88,7 @@ else()
 endif()
 
 if(WIN32)
-	add_definitions("-D _WIN32_WINNT=0x0A00 -D WINVER=0x0A00")
+	add_definitions("/D _WIN32_WINNT=0x0A00 /D WINVER=0x0A00")
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D_DEBUG")
 
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DUNICODE")
@@ -98,6 +98,8 @@ endif()
 
 if(UNIX OR LINUX OR MINGW)
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
+
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUNICODE")
 
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra")
@@ -236,4 +238,5 @@ cmake_cfg_install("${LIBVGM_SOURCE_DIR}/cmake/config.cmake.in"
 	VERSION "${LIBVGM_VERSION}"
 	TARGETS "${LIBVGM_INSTALL_TARGETS}"
 	DEPS "${LIBVGM_DEPS}"
-	)
+)
+
