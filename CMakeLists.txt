@@ -13,6 +13,7 @@ endif()
 project(libvgmMain VERSION 0.1 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_EXTENSIONS ON)	# for C++-style comments
 set(CMAKE_CXX_STANDARD 20)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/libs/cmake_modules/")
@@ -205,7 +206,7 @@ if(USE_SANITIZERS)
 endif(USE_SANITIZERS)
 
 if(MSVC)
-	find_package(Zlib REQUIRED)
+	find_package(ZLIB REQUIRED)
 endif()
 if(UNIX OR LINUX OR MINGW)
 	pkg_check_modules(ZLIB REQUIRED zlib)
@@ -230,7 +231,7 @@ if(BUILD_PLAYER)
 add_executable(player player.cpp player/dblk_compr.c)
 
 if(MSVC)
-	find_package(Zlib REQUIRED)
+	find_package(ZLIB REQUIRED)
 endif()
 if(UNIX OR LINUX OR MINGW)
 	pkg_check_modules(ZLIB REQUIRED zlib)

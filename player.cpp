@@ -32,8 +32,6 @@ extern "C" int __cdecl _kbhit(void);
 
 #include "common_def.h"
 #include "utils/DataLoader.h"
-#include "utils/FileLoader.h"
-#include "utils/MemoryLoader.h"
 #include "player/playerbase.hpp"
 #include "player/s98player.hpp"
 #include "player/droplayer.hpp"
@@ -48,6 +46,12 @@ extern "C" int __cdecl _kbhit(void);
 
 //#define USE_MEMORY_LOADER 1	// define to use the in-memory loader
 
+#if USE_MEMORY_LOADER
+#include "utils/MemoryLoader.h"
+#else
+#include "utils/FileLoader.h"
+#endif
+
 #ifdef _MSC_VER
 bool isLikelyUTF8(const wchar_t *wstr);
 bool isLikelyUTF16(const char *str);
@@ -60,7 +64,9 @@ int main(int argc, char* argv[]);
 static void DoChipControlMode(PlayerBase* player);
 static void StripNewline(char* str);
 static std::string FCC2Str(UINT32 fcc);
+#if USE_MEMORY_LOADER
 static UINT8 *SlurpFile(const char *fileName, UINT32 *fileSize);
+#endif
 static const char* GetFileTitle(const char* filePath);
 static UINT32 FillBuffer(void* drvStruct, void* userParam, UINT32 bufSize, void* Data);
 static UINT8 FilePlayCallback(PlayerBase* player, void* userParam, UINT8 evtType, void* evtParam);
@@ -246,7 +252,7 @@ int main(int argc, char* argv[])
 
 	fflush(stdout);
 
-#ifdef USE_MEMORY_LOADER
+#if USE_MEMORY_LOADER
 	UINT32 fileSize;
 #ifdef _MSC_VER
 	UINT8 *fileData = SlurpFile(argv_windows_UTF8[curSong],&fileSize);
@@ -600,7 +606,7 @@ int main(int argc, char* argv[])
 	mainPlr.Stop();
 	mainPlr.UnloadFile();
 	DataLoader_Deinit(dLoad);	dLoad = NULL;
-#ifdef USE_MEMORY_LOADER
+#if USE_MEMORY_LOADER
 	free(fileData);
 #endif
 
@@ -1136,6 +1142,7 @@ static std::string FCC2Str(UINT32 fcc)
 	return std::string(result);
 }
 
+#if USE_MEMORY_LOADER
 static UINT8 *SlurpFile(const char *fileName, UINT32 *fileSize)
 {
 
@@ -1180,6 +1187,7 @@ static UINT8 *SlurpFile(const char *fileName, UINT32 *fileSize)
 	*fileSize = hFileSize;
 	return fileData;
 }
+#endif
 
 static const char* GetFileTitle(const char* filePath)
 {
